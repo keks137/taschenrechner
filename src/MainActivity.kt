@@ -62,6 +62,7 @@ data class CalcState(
 	var strResult: String = "",
 	var tokens: MutableList<BK> = mutableListOf(),
 	var tpos: Int = 0,
+	var allowFallback: Boolean = false,
 )
 
 enum class Mode { CALC, CONVERT }
@@ -227,7 +228,6 @@ class MainActivity : Activity() {
 							setTextColor(theme.butAction.text)
 						}
 
-
 						BK.NUM_0,
 						BK.NUM_1,
 						BK.NUM_2,
@@ -238,15 +238,16 @@ class MainActivity : Activity() {
 						BK.NUM_7,
 						BK.NUM_8,
 						BK.NUM_9,
-						 -> {
+						-> {
 							backgroundTintList =
 								android.content.res.ColorStateList
 									.valueOf(theme.butNumber.col)
 
 							setTextColor(theme.butNumber.text)
 						}
-					//	BK.ADD, BK.SUB, BK.MUL, BK.DIV , BK.DOT
-					else-> {
+
+						// 	BK.ADD, BK.SUB, BK.MUL, BK.DIV , BK.DOT
+						else -> {
 							backgroundTintList =
 								android.content.res.ColorStateList
 									.valueOf(theme.butOperator.col)
@@ -289,18 +290,19 @@ class MainActivity : Activity() {
 	}
 
 	private fun handleInput(bkind: BK) {
+		state.allowFallback = true
 		when (bkind) {
 			BK.CLEAR -> {
 				state.tokens.clear()
 			}
 
 			BK.EQ -> {
-				calculate()
+				state.allowFallback = false
 			}
 
 			BK.BS -> {
-    state.tokens.removeLastOrNull()
-}
+				state.tokens.removeLastOrNull()
+			}
 
 			// "<->" -> {}
 
@@ -314,6 +316,7 @@ class MainActivity : Activity() {
 				state.tokens.add(bkind)
 			}
 		}
+		calculate()
 		updateDisplays()
 	}
 
@@ -324,7 +327,12 @@ class MainActivity : Activity() {
 		}
 
 		val result = evaluate()
-		state.strResult = result?.stripTrailingZeros()?.toPlainString() ?: "?" // ? = Error
+		if (result != null) {
+			state.strResult = result.stripTrailingZeros().toPlainString()
+		} else if (!state.allowFallback) {
+			// Strict mode: show error when = was pressed
+			state.strResult = "?"
+		}
 		state.tpos = 0
 	}
 
