@@ -1,0 +1,5 @@
+debug.keystore
+**.apk
+classes/
+dex/
+
