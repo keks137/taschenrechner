@@ -27,6 +27,8 @@ data class Theme(
 	val butActionText: Int,
 )
 
+enum class ButtonKind { NUMBER, EQ, CLEAR }
+
 enum class UIKind {
 	BACKGROUND,
 	RES_DISPLAY,
@@ -139,6 +141,7 @@ class MainActivity : Activity() {
 				"C",
 				"0",
 				"+",
+				"<->",
 				"=",
 			)
 
@@ -147,21 +150,28 @@ class MainActivity : Activity() {
 				Button(this).apply {
 					text = label
 					textSize = 24f
-					setTextColor(
-						when (label) {
-							"=", "C" -> theme.butActionText
-							"/", "*", "-", "+" -> theme.butOperatorText
-							else -> theme.butNumberText
-						},
-					)
-					backgroundTintList =
-						android.content.res.ColorStateList.valueOf(
-							when (label) {
-								"=", "C" -> theme.butAction
-								"/", "*", "-", "+" -> theme.butOperator
-								else -> theme.butNumber
-							},
-						)
+					when (label)
+					{
+						"=", "C", "<->" -> {
+							backgroundTintList =
+								android.content.res.ColorStateList
+									.valueOf(theme.butAction)
+
+							setTextColor(theme.butActionText)
+						}
+
+						"/", "*", "-", "+" -> {
+							backgroundTintList =android.content.res.ColorStateList.valueOf( theme.butOperator)
+
+							setTextColor(theme.butOperatorText)
+						}
+
+						else -> {
+							backgroundTintList =android.content.res.ColorStateList.valueOf( theme.butNumber)
+
+							setTextColor(theme.butNumberText)
+						}
+					}
 					layoutParams =
 						GridLayout.LayoutParams().apply {
 							width = 0
@@ -213,6 +223,8 @@ class MainActivity : Activity() {
 				calculate(display, expressionDisplay)
 			}
 
+			"<->" -> {}
+
 			"+", "-", "*", "/" -> {
 				if (currentInput.isNotEmpty()) {
 					previousValue = currentInput.toString().toBigDecimalOrNull()
@@ -245,8 +257,8 @@ class MainActivity : Activity() {
 	}
 
 	private fun calculate(
-		display: TextView,
-		expressionDisplay: TextView,
+		resDisplay: TextView,
+		inDisplay: TextView,
 	) {
 		val current = currentInput.toString().toBigDecimalOrNull() ?: return
 		val prev = previousValue ?: return
@@ -280,18 +292,16 @@ class MainActivity : Activity() {
 			}
 
 		if (result == null) {
-			display.text = "Error"
-			expressionDisplay.text = ""
+			resDisplay.text = "Error"
 			currentInput.clear()
 			previousValue = null
 			pendingOp = null
 			return
 		}
 
-		expressionDisplay.text = "${prev.stripTrailingZeros().toPlainString()} $op ${current.stripTrailingZeros().toPlainString()} ="
-		display.text = result.stripTrailingZeros().toPlainString()
+		resDisplay.text = result.stripTrailingZeros().toPlainString()
 
-		currentInput.clear().append(result)
+		// currentInput.clear().append(result)
 		previousValue = null
 		pendingOp = null
 	}
