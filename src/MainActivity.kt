@@ -46,6 +46,8 @@ enum class BK {
 	DOT,
 	EQ,
 	CLEAR,
+	LPAR,
+	RPAR,
 }
 
 enum class UIKind {
@@ -136,6 +138,8 @@ class MainActivity : Activity() {
 			BK.NUM_7 -> "7"
 			BK.NUM_8 -> "8"
 			BK.NUM_9 -> "9"
+			BK.LPAR -> "("
+			BK.RPAR -> ")"
 			else -> "unknown"
 		}
 
@@ -204,8 +208,8 @@ class MainActivity : Activity() {
 				BK.NUM_1,
 				BK.NUM_2,
 				BK.NUM_3,
-				BK.NONE,
-				BK.NONE,
+				BK.LPAR,
+				BK.RPAR,
 				BK.CLEAR,
 				BK.NUM_0,
 				BK.DOT,
@@ -365,19 +369,19 @@ class MainActivity : Activity() {
 	}
 
 	private fun mulDiv(): BigDecimal? {
-		var left = unaryOrNumber() ?: return null
+		var left = unaryOrParen() ?: return null
 
 		while (true) {
 			when (peek()) {
 				BK.MUL -> {
 					consume()
-					val right = unaryOrNumber() ?: return null
+					val right = unaryOrParen() ?: return null
 					left = left.multiply(right)
 				}
 
 				BK.DIV -> {
 					consume()
-					val right = unaryOrNumber() ?: return null
+					val right = unaryOrParen() ?: return null
 					if (right == BigDecimal.ZERO) return null // division by zero
 					left = left.divide(right, 10, RoundingMode.HALF_UP)
 				}
@@ -390,13 +394,32 @@ class MainActivity : Activity() {
 		return left
 	}
 
-	private fun unaryOrNumber(): BigDecimal? {
+	private fun unaryOrParen(): BigDecimal? {
 		if (peek() == BK.SUB) {
 			consume()
-			val inner = unaryOrNumber() ?: return null
+			val inner = unaryOrParen() ?: return null
 			return inner.negate()
 		}
-		return number()
+		return parenOrNumber()
+	}
+
+	private fun parenOrNumber(): BigDecimal? {
+		return when (peek()) {
+			BK.LPAR -> {
+				consume()
+				val expr = addSub() ?: return null
+				if (peek() == BK.RPAR) {
+					consume()
+					expr
+				} else {
+					null
+				}
+			}
+
+			else -> {
+				number()
+			}
+		}
 	}
 
 	private val DIGIT_TOKENS =
