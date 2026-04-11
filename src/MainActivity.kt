@@ -12,22 +12,39 @@ import android.widget.TextView
 import java.math.BigDecimal
 import java.math.RoundingMode
 
-data class Theme(
-	val background: Int,
-	val backgroundText: Int,
-	val inDisplay: Int,
-	val inDisplayText: Int,
-	val resDisplay: Int,
-	val resDisplayText: Int,
-	val butNumber: Int,
-	val butNumberText: Int,
-	val butOperator: Int,
-	val butOperatorText: Int,
-	val butAction: Int,
-	val butActionText: Int,
+data class ThemeComponent(
+	val col: Int,
+	val text: Int,
 )
 
-enum class ButtonKind { NUMBER, EQ, CLEAR }
+data class Theme(
+	val background: ThemeComponent,
+	val inDisplay: ThemeComponent,
+	val resDisplay: ThemeComponent,
+	val butNumber: ThemeComponent,
+	val butOperator: ThemeComponent,
+	val butAction: ThemeComponent,
+)
+
+enum class BK {
+	NONE,
+	NUM_0,
+	NUM_1,
+	NUM_2,
+	NUM_3,
+	NUM_4,
+	NUM_5,
+	NUM_6,
+	NUM_7,
+	NUM_8,
+	NUM_9,
+	ADD,
+	SUB,
+	MUL,
+	DIV,
+	EQ,
+	CLEAR,
+}
 
 enum class UIKind {
 	BACKGROUND,
@@ -39,33 +56,45 @@ enum class UIKind {
 }
 
 data class CalcState(
-	val mode: Mode = Mode.CALC,
-	val strIn: String = "",
-	val strResult: String = "",
+	var mode: Mode = Mode.CALC,
+	var strResult: String = "",
+	var tokens: MutableList<BK> = mutableListOf(),
+	var tpos: Int = 0,
 )
 
 enum class Mode { CALC, CONVERT }
 
 val CWELT_THEME =
 	Theme(
-		background = Color.parseColor("#000000"),
-		backgroundText = Color.parseColor("#FEED01"),
-		inDisplay = Color.parseColor("#000000"),
-		inDisplayText = Color.parseColor("#FEED01"),
-		resDisplay = Color.parseColor("#000000"),
-		resDisplayText = Color.parseColor("#FEED01"),
-		butNumber = Color.parseColor("#FEED01"),
-		butNumberText = Color.parseColor("#000000"),
-		butAction = Color.parseColor("#5F5F5F"),
-		butActionText = Color.parseColor("#FEED01"),
-		butOperator = Color.parseColor("#DBDBDB"),
-		butOperatorText = Color.parseColor("#000000"),
+		background = ThemeComponent(col = Color.parseColor("#000000"), text = Color.parseColor("#FEED01")),
+		inDisplay =
+			ThemeComponent(
+				col = Color.parseColor("#000000"),
+				text = Color.parseColor("#FEED01"),
+			),
+		resDisplay =
+			ThemeComponent(
+				col = Color.parseColor("#000000"),
+				text = Color.parseColor("#FEED01"),
+			),
+		butNumber =
+			ThemeComponent(
+				col = Color.parseColor("#FEED01"),
+				text = Color.parseColor("#000000"),
+			),
+		butAction =
+			ThemeComponent(
+				col = Color.parseColor("#5F5F5F"),
+				text = Color.parseColor("#FEED01"),
+			),
+		butOperator =
+			ThemeComponent(
+				col = Color.parseColor("#DBDBDB"),
+				text = Color.parseColor("#000000"),
+			),
 	)
 
 class MainActivity : Activity() {
-	private var currentInput = StringBuilder()
-	private var previousValue: BigDecimal? = null
-	private var pendingOp: String? = null
 	private val scale = 10
 
 	private var state = CalcState()
@@ -82,11 +111,41 @@ class MainActivity : Activity() {
 		}
 	}
 
+	private fun tokensToString(tokens: List<BK>): String = tokens.joinToString("") { buttonStr(it) }
+
+	private fun buttonStr(buttonKind: BK): String =
+		when (buttonKind) {
+			BK.EQ -> "="
+			BK.ADD -> "+"
+			BK.SUB -> "-"
+			BK.MUL -> "*"
+			BK.DIV -> "/"
+			BK.CLEAR -> "C"
+			BK.NUM_1 -> "1"
+			BK.NUM_2 -> "2"
+			BK.NUM_3 -> "3"
+			BK.NUM_4 -> "4"
+			BK.NUM_5 -> "5"
+			BK.NUM_6 -> "6"
+			BK.NUM_7 -> "7"
+			BK.NUM_8 -> "8"
+			BK.NUM_9 -> "9"
+			else -> "unknown"
+		}
+
+	private lateinit var inDisplay: TextView
+	private lateinit var resDisplay: TextView
+
+	private fun updateDisplays() {
+		inDisplay.text = tokensToString(state.tokens)
+		resDisplay.text = state.strResult.ifEmpty { "0" }
+	}
+
 	private fun buildUi() {
 		val root =
 			LinearLayout(this).apply {
 				orientation = LinearLayout.VERTICAL
-				setBackgroundColor(theme.background)
+				setBackgroundColor(theme.background.col)
 				layoutParams =
 					LinearLayout.LayoutParams(
 						LinearLayout.LayoutParams.MATCH_PARENT,
@@ -95,20 +154,20 @@ class MainActivity : Activity() {
 				setPadding(dp(16), dp(16), dp(16), dp(16))
 			}
 
-		val inDisplay =
+		inDisplay =
 			TextView(this).apply {
 				text = ""
 				textSize = 24f
-				setTextColor(theme.inDisplayText)
+				setTextColor(theme.inDisplay.text)
 				gravity = Gravity.END or Gravity.CENTER_VERTICAL
 				setPadding(dp(16), dp(16), dp(16), dp(8))
 			}
 
-		val resDisplay =
+		resDisplay =
 			TextView(this).apply {
 				text = "0"
 				textSize = 48f
-				setTextColor(theme.resDisplayText)
+				setTextColor(theme.resDisplay.text)
 				gravity = Gravity.END or Gravity.CENTER_VERTICAL
 				setPadding(dp(16), dp(8), dp(16), dp(32))
 			}
@@ -116,7 +175,7 @@ class MainActivity : Activity() {
 		val grid =
 			GridLayout(this).apply {
 				rowCount = 4
-				columnCount = 4
+				columnCount = 5
 				layoutParams =
 					LinearLayout.LayoutParams(
 						LinearLayout.LayoutParams.MATCH_PARENT,
@@ -125,51 +184,56 @@ class MainActivity : Activity() {
 			}
 
 		val buttons =
-			listOf(
-				"7",
-				"8",
-				"9",
-				"/",
-				"4",
-				"5",
-				"6",
-				"*",
-				"1",
-				"2",
-				"3",
-				"-",
-				"C",
-				"0",
-				"+",
-				"<->",
-				"=",
+			arrayOf(
+				BK.NUM_7,
+				BK.NUM_8,
+				BK.NUM_9,
+				BK.ADD,
+				BK.SUB,
+				BK.NUM_4,
+				BK.NUM_5,
+				BK.NUM_6,
+				BK.MUL,
+				BK.DIV,
+				BK.NUM_1,
+				BK.NUM_2,
+				BK.NUM_3,
+				BK.NONE,
+				BK.NONE,
+				BK.CLEAR,
+				BK.NUM_0,
+				BK.EQ,
 			)
 
-		buttons.forEach { label ->
+		buttons.forEach { bkind ->
 			val btn =
 				Button(this).apply {
-					text = label
+					text = buttonStr(bkind)
 					textSize = 24f
-					when (label)
+					when (bkind)
 					{
-						"=", "C", "<->" -> {
+						BK.EQ, BK.CLEAR -> {
 							backgroundTintList =
 								android.content.res.ColorStateList
-									.valueOf(theme.butAction)
+									.valueOf(theme.butAction.col)
 
-							setTextColor(theme.butActionText)
+							setTextColor(theme.butAction.text)
 						}
 
-						"/", "*", "-", "+" -> {
-							backgroundTintList =android.content.res.ColorStateList.valueOf( theme.butOperator)
+						BK.ADD, BK.SUB, BK.MUL, BK.DIV -> {
+							backgroundTintList =
+								android.content.res.ColorStateList
+									.valueOf(theme.butOperator.col)
 
-							setTextColor(theme.butOperatorText)
+							setTextColor(theme.butOperator.text)
 						}
 
 						else -> {
-							backgroundTintList =android.content.res.ColorStateList.valueOf( theme.butNumber)
+							backgroundTintList =
+								android.content.res.ColorStateList
+									.valueOf(theme.butNumber.col)
 
-							setTextColor(theme.butNumberText)
+							setTextColor(theme.butNumber.text)
 						}
 					}
 					layoutParams =
@@ -181,7 +245,7 @@ class MainActivity : Activity() {
 							setMargins(dp(4), dp(4), dp(4), dp(4))
 						}
 					setOnClickListener {
-						handleInput(label, resDisplay, inDisplay)
+						handleInput(bkind)
 					}
 				}
 			grid.addView(btn)
@@ -191,6 +255,7 @@ class MainActivity : Activity() {
 		root.addView(resDisplay)
 		root.addView(grid)
 		setContentView(root)
+		updateDisplays()
 	}
 
 	override fun onCreate(savedInstanceState: Bundle?) {
@@ -205,105 +270,150 @@ class MainActivity : Activity() {
 		buildUi()
 	}
 
-	private fun handleInput(
-		label: String,
-		display: TextView,
-		expressionDisplay: TextView,
-	) {
-		when (label) {
-			"C" -> {
-				currentInput.clear()
-				previousValue = null
-				pendingOp = null
-				display.text = "0"
-				expressionDisplay.text = ""
+	private fun handleInput(bkind: BK) {
+		when (bkind) {
+			BK.CLEAR -> {
+				state.tokens.clear()
 			}
 
-			"=" -> {
-				calculate(display, expressionDisplay)
+			BK.EQ -> {
+				calculate()
 			}
 
-			"<->" -> {}
+			// "<->" -> {}
 
-			"+", "-", "*", "/" -> {
-				if (currentInput.isNotEmpty()) {
-					previousValue = currentInput.toString().toBigDecimalOrNull()
-					pendingOp = label
-					currentInput.clear()
-					updateExpression(expressionDisplay)
-				}
-			}
+			// BK.ADD, BK.SUB, BK.MUL, BK.DIV -> {
+			// 	// if (inDisplay.isNotEmpty()) {
+			// 		updateExpression(expressionDisplay)
+			// 	// }
+			// }
 
 			else -> {
-				currentInput.append(label)
-				display.text = currentInput.toString()
-				updateExpression(expressionDisplay)
+				state.tokens.add(bkind)
 			}
 		}
+		updateDisplays()
 	}
 
-	private fun updateExpression(expressionDisplay: TextView) {
-		val expr = StringBuilder()
-		if (previousValue != null) {
-			expr.append(previousValue!!.stripTrailingZeros().toPlainString())
-			expr.append(" ")
-			expr.append(pendingOp)
-			expr.append(" ")
-		}
-		if (currentInput.isNotEmpty()) {
-			expr.append(currentInput.toString())
-		}
-		expressionDisplay.text = expr.toString()
-	}
-
-	private fun calculate(
-		resDisplay: TextView,
-		inDisplay: TextView,
-	) {
-		val current = currentInput.toString().toBigDecimalOrNull() ?: return
-		val prev = previousValue ?: return
-		val op = pendingOp ?: return
-
-		val result =
-			when (op) {
-				"+" -> {
-					prev.add(current)
-				}
-
-				"-" -> {
-					prev.subtract(current)
-				}
-
-				"*" -> {
-					prev.multiply(current)
-				}
-
-				"/" -> {
-					if (current.compareTo(BigDecimal.ZERO) != 0) {
-						prev.divide(current, scale, RoundingMode.HALF_UP)
-					} else {
-						null
-					}
-				}
-
-				else -> {
-					return
-				}
-			}
-
-		if (result == null) {
-			resDisplay.text = "Error"
-			currentInput.clear()
-			previousValue = null
-			pendingOp = null
+	private fun calculate() {
+		if (state.tokens.isEmpty()) {
+			state.strResult = ""
 			return
 		}
 
-		resDisplay.text = result.stripTrailingZeros().toPlainString()
+		val result = evaluate()
+		state.strResult = result?.stripTrailingZeros()?.toPlainString() ?: "?" // ? = Error
+		state.tpos = 0
+	}
 
-		// currentInput.clear().append(result)
-		previousValue = null
-		pendingOp = null
+	private fun peek() = state.tokens.getOrNull(state.tpos)
+
+	private fun consume() = state.tokens.getOrNull(state.tpos++)
+
+	private fun addSub(): BigDecimal? {
+		var left = mulDiv() ?: return null
+		while (true) {
+			when (peek()) {
+				BK.ADD -> {
+					consume()
+					val right = mulDiv() ?: return null
+					left = left.add(right)
+				}
+
+				BK.SUB -> {
+					consume()
+					val right = mulDiv() ?: return null
+					left = left.subtract(right)
+				}
+
+				else -> {
+					break
+				}
+			}
+		}
+		return left
+	}
+
+	private fun mulDiv(): BigDecimal? {
+		var left = unaryOrNumber() ?: return null
+		while (true) {
+			when (peek()) {
+				BK.MUL -> {
+					consume()
+					val right = unaryOrNumber() ?: return null
+					left = left.multiply(right)
+				}
+
+				BK.DIV -> {
+					consume()
+					val right = unaryOrNumber() ?: return null
+					if (right == BigDecimal.ZERO) return null // division by zero
+					left = left.divide(right, 10, RoundingMode.HALF_UP)
+				}
+
+				else -> {
+					break
+				}
+			}
+		}
+		return left
+	}
+
+	private fun unaryOrNumber(): BigDecimal? {
+		if (peek() == BK.SUB) {
+			consume()
+			val inner = unaryOrNumber() ?: return null
+			return inner.negate()
+		}
+		return number()
+	}
+
+	private val DIGIT_TOKENS =
+		setOf(
+			BK.NUM_0,
+			BK.NUM_1,
+			BK.NUM_2,
+			BK.NUM_3,
+			BK.NUM_4,
+			BK.NUM_5,
+			BK.NUM_6,
+			BK.NUM_7,
+			BK.NUM_8,
+			BK.NUM_9,
+		)
+
+	private fun BK.toDigit(): Char? =
+		when (this) {
+			BK.NUM_0 -> '0'
+			BK.NUM_1 -> '1'
+			BK.NUM_2 -> '2'
+			BK.NUM_3 -> '3'
+			BK.NUM_4 -> '4'
+			BK.NUM_5 -> '5'
+			BK.NUM_6 -> '6'
+			BK.NUM_7 -> '7'
+			BK.NUM_8 -> '8'
+			BK.NUM_9 -> '9'
+			else -> null
+		}
+
+	private fun number(): BigDecimal? {
+		val sb = StringBuilder()
+		while (peek() in DIGIT_TOKENS) {
+			peek()?.toDigit()?.let { sb.append(it) }
+			consume()
+		}
+		if (sb.isEmpty()) return null
+		return sb.toString().toBigDecimalOrNull()
+	}
+
+	private fun evaluate(): BigDecimal? {
+		var tokens = state.tokens
+
+		val result = addSub()
+		// Ensure we consumed all tokens
+		if (state.tpos != tokens.size) return null
+		return result
 	}
 
 	private fun dp(px: Int): Int = (px * resources.displayMetrics.density).toInt()
