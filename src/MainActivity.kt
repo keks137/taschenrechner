@@ -382,8 +382,13 @@ class MainActivity : Activity() {
 				BK.DIV -> {
 					consume()
 					val right = unaryOrParen() ?: return null
-					if (right == BigDecimal.ZERO) return null // division by zero
+					if (right == BigDecimal.ZERO) return null
 					left = left.divide(right, 10, RoundingMode.HALF_UP)
+				}
+
+				BK.LPAR, in DIGIT_TOKENS -> {
+					val right = unaryOrParen() ?: return null
+					left = left.multiply(right)
 				}
 
 				else -> {
@@ -408,12 +413,18 @@ class MainActivity : Activity() {
 			BK.LPAR -> {
 				consume()
 				val expr = addSub() ?: return null
-				if (peek() == BK.RPAR) {
-					consume()
-					expr
-				} else {
-					null
+				when (peek()) {
+					BK.RPAR -> {
+						consume()
+					}
+
+					null -> { /* auto-close at end of input */ }
+
+					else -> {
+						return null
+					}
 				}
+				expr
 			}
 
 			else -> {
