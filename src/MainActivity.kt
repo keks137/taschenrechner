@@ -41,7 +41,9 @@ enum class BK {
 	ADD,
 	SUB,
 	MUL,
+	BS,
 	DIV,
+	DOT,
 	EQ,
 	CLEAR,
 }
@@ -116,10 +118,12 @@ class MainActivity : Activity() {
 	private fun buttonStr(buttonKind: BK): String =
 		when (buttonKind) {
 			BK.EQ -> "="
+			BK.BS -> "<-"
 			BK.ADD -> "+"
 			BK.SUB -> "-"
 			BK.MUL -> "*"
 			BK.DIV -> "/"
+			BK.DOT -> "."
 			BK.CLEAR -> "C"
 			BK.NUM_0 -> "0"
 			BK.NUM_1 -> "1"
@@ -203,6 +207,8 @@ class MainActivity : Activity() {
 				BK.NONE,
 				BK.CLEAR,
 				BK.NUM_0,
+				BK.DOT,
+				BK.BS,
 				BK.EQ,
 			)
 
@@ -213,7 +219,7 @@ class MainActivity : Activity() {
 					textSize = 24f
 					when (bkind)
 					{
-						BK.EQ, BK.CLEAR -> {
+						BK.EQ, BK.CLEAR, BK.BS -> {
 							backgroundTintList =
 								android.content.res.ColorStateList
 									.valueOf(theme.butAction.col)
@@ -221,7 +227,7 @@ class MainActivity : Activity() {
 							setTextColor(theme.butAction.text)
 						}
 
-						BK.ADD, BK.SUB, BK.MUL, BK.DIV -> {
+						BK.ADD, BK.SUB, BK.MUL, BK.DIV , BK.DOT-> {
 							backgroundTintList =
 								android.content.res.ColorStateList
 									.valueOf(theme.butOperator.col)
@@ -281,6 +287,10 @@ class MainActivity : Activity() {
 				calculate()
 			}
 
+			BK.BS -> {
+    state.tokens.removeLastOrNull()
+}
+
 			// "<->" -> {}
 
 			// BK.ADD, BK.SUB, BK.MUL, BK.DIV -> {
@@ -337,6 +347,7 @@ class MainActivity : Activity() {
 
 	private fun mulDiv(): BigDecimal? {
 		var left = unaryOrNumber() ?: return null
+
 		while (true) {
 			when (peek()) {
 				BK.MUL -> {
@@ -400,11 +411,29 @@ class MainActivity : Activity() {
 
 	private fun number(): BigDecimal? {
 		val sb = StringBuilder()
-		while (peek() in DIGIT_TOKENS) {
-			peek()?.toDigit()?.let { sb.append(it) }
-			consume()
+		var hasDot = false
+
+		while (true) {
+			when (peek()) {
+				in DIGIT_TOKENS -> {
+					peek()?.toDigit()?.let { sb.append(it) }
+					consume()
+				}
+
+				BK.DOT -> {
+					if (hasDot) break
+					hasDot = true
+					sb.append('.')
+					consume()
+				}
+
+				else -> {
+					break
+				}
+			}
 		}
-		if (sb.isEmpty()) return null
+
+		if (sb.isEmpty() || sb.toString() == ".") return null
 		return sb.toString().toBigDecimalOrNull()
 	}
 
