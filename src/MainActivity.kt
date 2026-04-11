@@ -121,6 +121,7 @@ class MainActivity : Activity() {
 			BK.MUL -> "*"
 			BK.DIV -> "/"
 			BK.CLEAR -> "C"
+			BK.NUM_0 -> "0"
 			BK.NUM_1 -> "1"
 			BK.NUM_2 -> "2"
 			BK.NUM_3 -> "3"
