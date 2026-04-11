@@ -227,20 +227,31 @@ class MainActivity : Activity() {
 							setTextColor(theme.butAction.text)
 						}
 
-						BK.ADD, BK.SUB, BK.MUL, BK.DIV , BK.DOT-> {
-							backgroundTintList =
-								android.content.res.ColorStateList
-									.valueOf(theme.butOperator.col)
 
-							setTextColor(theme.butOperator.text)
-						}
-
-						else -> {
+						BK.NUM_0,
+						BK.NUM_1,
+						BK.NUM_2,
+						BK.NUM_3,
+						BK.NUM_4,
+						BK.NUM_5,
+						BK.NUM_6,
+						BK.NUM_7,
+						BK.NUM_8,
+						BK.NUM_9,
+						 -> {
 							backgroundTintList =
 								android.content.res.ColorStateList
 									.valueOf(theme.butNumber.col)
 
 							setTextColor(theme.butNumber.text)
+						}
+					//	BK.ADD, BK.SUB, BK.MUL, BK.DIV , BK.DOT
+					else-> {
+							backgroundTintList =
+								android.content.res.ColorStateList
+									.valueOf(theme.butOperator.col)
+
+							setTextColor(theme.butOperator.text)
 						}
 					}
 					layoutParams =
