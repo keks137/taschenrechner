@@ -1,3 +1,2 @@
-<div style="background-color: #feed01;">
-<svg src="https://github.com/keks137/taschenrechner/blob/master/icon.svg">
-</div>
+<img src="https://raw.githubusercontent.com/keks137/taschenrechner/master/res/mipmap-xxxhdpi/ic_launcher.png" alt="" >
+A calculator
