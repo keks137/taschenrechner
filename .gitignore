@@ -1,4 +1,5 @@
 debug.keystore
+compiled_res/
 **.apk
 classes/
 dex/

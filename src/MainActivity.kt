@@ -5,25 +5,28 @@ import android.graphics.Color
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.GridLayout
 import android.widget.LinearLayout
+import android.widget.Spinner
 import android.widget.TextView
 import java.math.BigDecimal
 import java.math.RoundingMode
 
-data class ThemeComponent(
+data class ThemeColors(
 	val col: Int,
 	val text: Int,
 )
 
 data class Theme(
-	val background: ThemeComponent,
-	val inDisplay: ThemeComponent,
-	val resDisplay: ThemeComponent,
-	val butNumber: ThemeComponent,
-	val butOperator: ThemeComponent,
-	val butAction: ThemeComponent,
+	val background: ThemeColors,
+	val inDisplay: ThemeColors,
+	val resDisplay: ThemeColors,
+	val butNumber: ThemeColors,
+	val butOperator: ThemeColors,
+	val butAction: ThemeColors,
 )
 
 enum class BK {
@@ -67,36 +70,91 @@ data class CalcState(
 	var allowFallback: Boolean = false,
 )
 
+data class CalcViews(
+	val root: View,
+	val inp: TextView,
+	val res: TextView,
+	val pad: GridLayout,
+)
+
+data class ConvertViews(
+	val root: View,
+	val inp: TextView,
+	val res: TextView,
+	val pad: GridLayout,
+	val fromUnit: Spinner,
+	val toUnit: Spinner,
+	val convertButton: Button,
+)
+
 enum class Mode { CALC, CONVERT }
 
 val CWELT_THEME =
 	Theme(
-		background = ThemeComponent(col = Color.parseColor("#000000"), text = Color.parseColor("#FEED01")),
+		background = ThemeColors(col = Color.parseColor("#000000"), text = Color.parseColor("#FEED01")),
 		inDisplay =
-			ThemeComponent(
+			ThemeColors(
 				col = Color.parseColor("#000000"),
 				text = Color.parseColor("#FEED01"),
 			),
 		resDisplay =
-			ThemeComponent(
+			ThemeColors(
 				col = Color.parseColor("#000000"),
 				text = Color.parseColor("#FEED01"),
 			),
 		butNumber =
-			ThemeComponent(
+			ThemeColors(
 				col = Color.parseColor("#FEED01"),
 				text = Color.parseColor("#000000"),
 			),
 		butAction =
-			ThemeComponent(
+			ThemeColors(
 				col = Color.parseColor("#5F5F5F"),
 				text = Color.parseColor("#FEED01"),
 			),
 		butOperator =
-			ThemeComponent(
+			ThemeColors(
 				col = Color.parseColor("#DBDBDB"),
 				text = Color.parseColor("#000000"),
 			),
+	)
+
+val DIGIT_TOKENS =
+	setOf(
+		BK.NUM_0,
+		BK.NUM_1,
+		BK.NUM_2,
+		BK.NUM_3,
+		BK.NUM_4,
+		BK.NUM_5,
+		BK.NUM_6,
+		BK.NUM_7,
+		BK.NUM_8,
+		BK.NUM_9,
+	)
+
+val BUTTON_LAYOUT =
+	arrayOf(
+		BK.NUM_7,
+		BK.NUM_8,
+		BK.NUM_9,
+		BK.ADD,
+		BK.SUB,
+		BK.NUM_4,
+		BK.NUM_5,
+		BK.NUM_6,
+		BK.MUL,
+		BK.DIV,
+		BK.NUM_1,
+		BK.NUM_2,
+		BK.NUM_3,
+		BK.LPAR,
+		BK.RPAR,
+		BK.CLEAR,
+		BK.NUM_0,
+		BK.DOT,
+		BK.BS,
+		BK.EQ,
 	)
 
 class MainActivity : Activity() {
@@ -104,6 +162,9 @@ class MainActivity : Activity() {
 
 	private var state = CalcState()
 	private val theme = CWELT_THEME
+
+	private lateinit var calc: CalcViews
+	private lateinit var convert: ConvertViews
 
 	override fun onWindowFocusChanged(hasFocus: Boolean) {
 		super.onWindowFocusChanged(hasFocus)
@@ -114,6 +175,254 @@ class MainActivity : Activity() {
 					View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
 			)
 		}
+	}
+
+	override fun onCreate(savedInstanceState: Bundle?) {
+		super.onCreate(savedInstanceState)
+
+		window.decorView.systemUiVisibility = (
+			View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+				View.SYSTEM_UI_FLAG_FULLSCREEN or
+				View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+		)
+
+		state = CalcState()
+
+		calc = buildCalcScreen()
+		convert = buildConvertScreen()
+
+		val root =
+			FrameLayout(this).apply {
+				addView(calc.root)
+				addView(convert.root.apply { visibility = View.GONE })
+			}
+		setContentView(root)
+	}
+
+	private fun buildCalcScreen(): CalcViews {
+		val input =
+			TextView(this).apply {
+				text = ""
+				textSize = 24f
+				setTextColor(theme.inDisplay.text)
+				gravity = Gravity.END or Gravity.CENTER_VERTICAL
+				setPadding(dp(16), dp(16), dp(16), dp(8))
+			}
+
+		val result =
+			TextView(this).apply {
+				text = "0"
+				textSize = 48f
+				setTextColor(theme.resDisplay.text)
+				gravity = Gravity.END or Gravity.CENTER_VERTICAL
+				setPadding(dp(16), dp(8), dp(16), dp(32))
+			}
+
+		val pad = buildButtonGrid { handleCalcInput(it) }
+
+		val root =
+			LinearLayout(this).apply {
+				orientation = LinearLayout.VERTICAL
+				setBackgroundColor(theme.background.col)
+				setPadding(dp(16), dp(16), dp(16), dp(16))
+				addView(modeToggle { switchMode(Mode.CONVERT) })
+				addView(input)
+				addView(result)
+				addView(
+					View(context).apply {
+						layoutParams =
+							LinearLayout.LayoutParams(
+								LinearLayout.LayoutParams.MATCH_PARENT,
+								0,
+								1f,
+							)
+					},
+				)
+
+				addView(pad)
+			}
+
+		return CalcViews(root, input, result, pad)
+	}
+
+	private fun buildConvertScreen(): ConvertViews {
+		val input =
+			TextView(this).apply {
+				text = "0"
+				textSize = 32f
+				setTextColor(theme.inDisplay.text)
+				gravity = Gravity.END
+				setPadding(dp(16), dp(24), dp(16), dp(8))
+			}
+
+		val result =
+			TextView(this).apply {
+				text = "0"
+				textSize = 48f
+				setTextColor(theme.resDisplay.text)
+				gravity = Gravity.END
+				setPadding(dp(16), dp(32), dp(16), dp(16))
+			}
+
+		val fromUnit = Spinner(this)
+		val toUnit = Spinner(this)
+
+		val unitRow =
+			LinearLayout(this).apply {
+				orientation = LinearLayout.HORIZONTAL
+				weightSum = 2f
+				addView(
+					fromUnit.apply {
+						layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f)
+					},
+				)
+				addView(
+					toUnit.apply {
+						layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f)
+					},
+				)
+			}
+
+		val convertButton =
+			Button(this).apply {
+				text = "Convert"
+				textSize = 24f
+				backgroundTintList =
+					android.content.res.ColorStateList
+						.valueOf(theme.butOperator.col)
+				setTextColor(theme.butOperator.text)
+				setOnClickListener { doConversion() }
+			}
+
+		val pad = buildButtonGrid { handleConvertInput(it) }
+
+		val root =
+			LinearLayout(this).apply {
+				orientation = LinearLayout.VERTICAL
+				setBackgroundColor(theme.background.col)
+				setPadding(dp(16), dp(16), dp(16), dp(16))
+				addView(modeToggle { switchMode(Mode.CALC) })
+				addView(input)
+				addView(unitRow)
+				addView(convertButton)
+				addView(result)
+				addView(
+					View(context).apply {
+						layoutParams =
+							LinearLayout.LayoutParams(
+								LinearLayout.LayoutParams.MATCH_PARENT,
+								0,
+								1f,
+							)
+					},
+				)
+
+				addView(pad)
+			}
+
+		return ConvertViews(root, input, result, pad, fromUnit, toUnit, convertButton)
+	}
+
+	private fun modeToggle(onClick: () -> Unit): Button =
+		Button(this).apply {
+			text = "⇄"
+			textSize = 20f
+			backgroundTintList =
+				android.content.res.ColorStateList
+					.valueOf(theme.butAction.col)
+			setTextColor(theme.butAction.text)
+			setOnClickListener { onClick() }
+		}
+
+	private fun buildButtonGrid(onClick: (BK) -> Unit): GridLayout =
+		GridLayout(this).apply {
+			rowCount = 4
+			columnCount = 5
+
+			BUTTON_LAYOUT.forEach { bkind ->
+				addView(makeButton(bkind, onClick))
+			}
+		}
+
+	private fun makeButton(
+		bkind: BK,
+		onClick: (BK) -> Unit,
+	): Button {
+		val (bgColor, textColor) =
+			when (bkind) {
+				BK.EQ, BK.CLEAR, BK.BS -> theme.butAction.col to theme.butAction.text
+				in DIGIT_TOKENS -> theme.butNumber.col to theme.butNumber.text
+				else -> theme.butOperator.col to theme.butOperator.text
+			}
+
+		return Button(this).apply {
+			text = buttonStr(bkind)
+			textSize = 24f
+			backgroundTintList =
+				android.content.res.ColorStateList
+					.valueOf(bgColor)
+			setTextColor(textColor)
+			layoutParams =
+				GridLayout.LayoutParams().apply {
+					width = 0
+					height = dp(64)
+					columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+					rowSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+					setMargins(dp(4), dp(4), dp(4), dp(4))
+				}
+			setOnClickListener { onClick(bkind) }
+		}
+	}
+
+	private fun switchMode(newMode: Mode) {
+		state.mode = newMode
+		calc.root.visibility = if (newMode == Mode.CALC) View.VISIBLE else View.GONE
+		convert.root.visibility = if (newMode == Mode.CONVERT) View.VISIBLE else View.GONE
+
+		if (newMode == Mode.CONVERT) {
+			convert.inp.text = tokensToString(state.tokens).ifEmpty { "0" }
+		}
+	}
+
+	private fun handleCalcInput(bkind: BK) {
+		state.allowFallback = true
+		when (bkind) {
+			BK.CLEAR -> state.tokens.clear()
+			BK.EQ -> state.allowFallback = false
+			BK.BS -> state.tokens.removeLastOrNull()
+			else -> state.tokens.add(bkind)
+		}
+		calculate()
+		calc.inp.text = tokensToString(state.tokens)
+		calc.res.text = state.strResult.ifEmpty { "0" }
+	}
+
+	private fun handleConvertInput(bkind: BK) {
+		val current = convert.inp.text.toString()
+		when (bkind) {
+			BK.CLEAR -> {
+				convert.inp.text = "0"
+			}
+
+			BK.BS -> {
+				convert.inp.text = current.dropLast(1).ifEmpty { "0" }
+			}
+
+			BK.DOT -> {
+				if (!current.contains(".")) convert.inp.text = "$current."
+			}
+
+			in DIGIT_TOKENS -> {
+				val digit = buttonStr(bkind)
+				convert.inp.text = if (current == "0") digit else "$current$digit"
+			}
+
+			else -> {}
+		}
+	}
+
+	private fun doConversion() {
+		// TODO: implement conversion logic
 	}
 
 	private fun tokensToString(tokens: List<BK>): String = tokens.joinToString("") { buttonStr(it) }
@@ -140,157 +449,12 @@ class MainActivity : Activity() {
 			BK.NUM_9 -> "9"
 			BK.LPAR -> "("
 			BK.RPAR -> ")"
-			else -> "unknown"
+			BK.NONE -> "unknown"
 		}
 
-	private lateinit var inDisplay: TextView
-	private lateinit var resDisplay: TextView
-
-	private fun updateDisplays() {
-		inDisplay.text = tokensToString(state.tokens)
-		resDisplay.text = state.strResult.ifEmpty { "0" }
-	}
-
-	private fun buildUi() {
-		val root =
-			LinearLayout(this).apply {
-				orientation = LinearLayout.VERTICAL
-				setBackgroundColor(theme.background.col)
-				layoutParams =
-					LinearLayout.LayoutParams(
-						LinearLayout.LayoutParams.MATCH_PARENT,
-						LinearLayout.LayoutParams.MATCH_PARENT,
-					)
-				setPadding(dp(16), dp(16), dp(16), dp(16))
-			}
-
-		inDisplay =
-			TextView(this).apply {
-				text = ""
-				textSize = 24f
-				setTextColor(theme.inDisplay.text)
-				gravity = Gravity.END or Gravity.CENTER_VERTICAL
-				setPadding(dp(16), dp(16), dp(16), dp(8))
-			}
-
-		resDisplay =
-			TextView(this).apply {
-				text = "0"
-				textSize = 48f
-				setTextColor(theme.resDisplay.text)
-				gravity = Gravity.END or Gravity.CENTER_VERTICAL
-				setPadding(dp(16), dp(8), dp(16), dp(32))
-			}
-
-		val grid =
-			GridLayout(this).apply {
-				rowCount = 4
-				columnCount = 5
-				layoutParams =
-					LinearLayout.LayoutParams(
-						LinearLayout.LayoutParams.MATCH_PARENT,
-						LinearLayout.LayoutParams.WRAP_CONTENT,
-					)
-			}
-
-		val buttons =
-			arrayOf(
-				BK.NUM_7,
-				BK.NUM_8,
-				BK.NUM_9,
-				BK.ADD,
-				BK.SUB,
-				BK.NUM_4,
-				BK.NUM_5,
-				BK.NUM_6,
-				BK.MUL,
-				BK.DIV,
-				BK.NUM_1,
-				BK.NUM_2,
-				BK.NUM_3,
-				BK.LPAR,
-				BK.RPAR,
-				BK.CLEAR,
-				BK.NUM_0,
-				BK.DOT,
-				BK.BS,
-				BK.EQ,
-			)
-
-		buttons.forEach { bkind ->
-			val btn =
-				Button(this).apply {
-					text = buttonStr(bkind)
-					textSize = 24f
-					when (bkind)
-					{
-						BK.EQ, BK.CLEAR, BK.BS -> {
-							backgroundTintList =
-								android.content.res.ColorStateList
-									.valueOf(theme.butAction.col)
-
-							setTextColor(theme.butAction.text)
-						}
-
-						BK.NUM_0,
-						BK.NUM_1,
-						BK.NUM_2,
-						BK.NUM_3,
-						BK.NUM_4,
-						BK.NUM_5,
-						BK.NUM_6,
-						BK.NUM_7,
-						BK.NUM_8,
-						BK.NUM_9,
-						-> {
-							backgroundTintList =
-								android.content.res.ColorStateList
-									.valueOf(theme.butNumber.col)
-
-							setTextColor(theme.butNumber.text)
-						}
-
-						// 	BK.ADD, BK.SUB, BK.MUL, BK.DIV , BK.DOT
-						else -> {
-							backgroundTintList =
-								android.content.res.ColorStateList
-									.valueOf(theme.butOperator.col)
-
-							setTextColor(theme.butOperator.text)
-						}
-					}
-					layoutParams =
-						GridLayout.LayoutParams().apply {
-							width = 0
-							height = dp(64)
-							columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
-							rowSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
-							setMargins(dp(4), dp(4), dp(4), dp(4))
-						}
-					setOnClickListener {
-						handleInput(bkind)
-					}
-				}
-			grid.addView(btn)
-		}
-
-		root.addView(inDisplay)
-		root.addView(resDisplay)
-		root.addView(grid)
-		setContentView(root)
-		updateDisplays()
-	}
-
-	override fun onCreate(savedInstanceState: Bundle?) {
-		super.onCreate(savedInstanceState)
-
-		window.decorView.systemUiVisibility = (
-			View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-				View.SYSTEM_UI_FLAG_FULLSCREEN or
-				View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-		)
-
-		buildUi()
+	private fun updateCalcDisplays() {
+		calc.inp.text = tokensToString(state.tokens)
+		calc.res.text = state.strResult.ifEmpty { "0" }
 	}
 
 	private fun handleInput(bkind: BK) {
@@ -321,7 +485,7 @@ class MainActivity : Activity() {
 			}
 		}
 		calculate()
-		updateDisplays()
+		updateCalcDisplays()
 	}
 
 	private fun calculate() {
