@@ -1,2 +1,3 @@
-<img align="left" src="https://github.com/keks137/raylib/blob/master/1024.png">
-
+<div style="background-color: #feed01;">
+<svg src="https://github.com/keks137/taschenrechner/blob/master/icon.svg">
+</div>
