@@ -166,25 +166,10 @@ class MainActivity : Activity() {
 	private lateinit var calc: CalcViews
 	private lateinit var convert: ConvertViews
 
-	override fun onWindowFocusChanged(hasFocus: Boolean) {
-		super.onWindowFocusChanged(hasFocus)
-		if (hasFocus) {
-			window.decorView.systemUiVisibility = (
-				View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-					View.SYSTEM_UI_FLAG_FULLSCREEN or
-					View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-			)
-		}
-	}
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 
-		window.decorView.systemUiVisibility = (
-			View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-				View.SYSTEM_UI_FLAG_FULLSCREEN or
-				View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-		)
 
 		state = CalcState()
 
